@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>기말고사 목표 점수</title>
+<style>
+  :root {
+    --bg: #F2F2F7; --card: #FFFFFF; --ink: #000000; --ink2: rgba(60,60,67,.6); --ink3: rgba(60,60,67,.3);
+    --sep: rgba(60,60,67,.18); --fill: rgba(118,118,128,.12); --fill2: rgba(118,118,128,.2); --press: rgba(0,0,0,.05);
+    --blue: #007AFF; --green: #34C759; --orange: #FF9500; --red: #FF3B30; --gray: #8E8E93;
+    --thumb: #FFFFFF; --bar: rgba(242,242,247,.72);
+    --ease: cubic-bezier(.22,1,.36,1); /* damping 1.0 스프링 근사 */
+    --round: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #000000; --card: #1C1C1E; --ink: #FFFFFF; --ink2: rgba(235,235,245,.6); --ink3: rgba(235,235,245,.3);
+      --sep: rgba(84,84,88,.65); --fill: rgba(118,118,128,.24); --fill2: rgba(118,118,128,.32); --press: rgba(255,255,255,.08);
+      --blue: #0A84FF; --green: #30D158; --orange: #FF9F0A; --red: #FF453A; --gray: #8E8E93;
+      --thumb: #636366; --bar: rgba(0,0,0,.72);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #000000; --card: #1C1C1E; --ink: #FFFFFF; --ink2: rgba(235,235,245,.6); --ink3: rgba(235,235,245,.3);
+    --sep: rgba(84,84,88,.65); --fill: rgba(118,118,128,.24); --fill2: rgba(118,118,128,.32); --press: rgba(255,255,255,.08);
+    --blue: #0A84FF; --green: #30D158; --orange: #FF9F0A; --red: #FF453A; --gray: #8E8E93;
+    --thumb: #636366; --bar: rgba(0,0,0,.72);
+  }
+  @media (prefers-contrast: more) {
+    :root { --ink2: rgba(60,60,67,.85); --sep: rgba(60,60,67,.5); }
+    .group, .hero { outline: 1px solid var(--ink3); }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 1.0625rem/1.4 system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    letter-spacing: -0.01em; word-break: keep-all; font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 34rem; margin: 0 auto; padding: 0 1rem; }
+  button { font: inherit; color: inherit; }
+
+  /* ── 라지 타이틀 + 유리 바 ── */
+  .large { padding: calc(1.5rem + env(safe-area-inset-top, 0px)) 0 .25rem; }
+  .large h1 { margin: 0 .25rem; font-size: 2.125rem; line-height: 1.12; font-weight: 800; letter-spacing: -0.03em; }
+  .bar {
+    position: sticky; top: 0; z-index: 5; padding: .5rem 0 .625rem;
+    padding-top: calc(.5rem + env(safe-area-inset-top, 0px) * var(--stuck, 0));
+    transition: background-color .25s var(--ease);
+  }
+  .bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: .5px; background: var(--sep); opacity: 0; transition: opacity .25s; }
+  .bar.stuck { --stuck: 1; background: var(--bar); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+  .bar.stuck::after { opacity: 1; }
+  .chips { display: flex; gap: .5rem; overflow-x: auto; padding: .125rem 1rem; scrollbar-width: none; max-width: 34rem; margin: 0 auto; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; appearance: none; border: 0; border-radius: 99px; cursor: pointer;
+    height: 2.25rem; padding: 0 1rem; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: var(--fill); color: var(--ink); font-size: .9375rem; font-weight: 600;
+    transition: background-color .25s var(--ease), color .25s var(--ease), transform .1s ease-out;
+  }
+  .chip:active { transform: scale(.95); }
+  .chip[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+  .chip:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .chip.add { width: 2.25rem; padding: 0; display: grid; place-items: center; background: var(--fill); color: var(--blue); }
+  .chip.add svg { width: .875rem; height: .875rem; }
+
+  /* ── 결과 카드 ── */
+  .hero { margin-top: .5rem; padding: 1rem 1rem 1.25rem; background: var(--card); border-radius: 22px; }
+  .seg { --i: 0; position: relative; display: grid; grid-template-columns: repeat(5, 1fr); padding: 2px; border-radius: 10px; background: var(--fill); }
+  .thumb {
+    position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 5); border-radius: 8px;
+    background: var(--thumb); box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.04);
+    transform: translateX(calc(var(--i) * 100%)); transition: transform .4s var(--ease);
+  }
+  .seg button {
+    position: relative; appearance: none; border: 0; background: transparent; cursor: pointer; border-radius: 8px;
+    height: 3.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3125rem; color: var(--ink2); transition: color .2s, transform .1s ease-out;
+  }
+  .seg button:active { transform: scale(.94); }
+  .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .seg button[aria-checked="true"] { color: var(--ink); }
+  .g { font-family: var(--round); font-size: 1.25rem; font-weight: 800; line-height: 1; text-box: trim-both cap alphabetic; }
+  .gs { font-size: .625rem; line-height: 1; text-box: trim-both cap alphabetic; font-weight: 600; letter-spacing: .01em; color: var(--ink2); }
+  .gs:empty { display: none; }
+  .seg button.imp .g { color: var(--ink3); text-decoration: line-through; text-decoration-thickness: 2px; }
+  .seg button.done .gs { color: var(--green); }
+
+  .gauge { --v: 0; --c: var(--blue); position: relative; width: 12rem; height: 12rem; margin: 1.25rem auto .75rem; }
+  .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .gauge .track { fill: none; stroke: var(--fill); stroke-width: 13; }
+  .gauge .arc {
+    fill: none; stroke: var(--c); stroke-width: 13; stroke-linecap: round; stroke-dasharray: 100 100;
+    stroke-dashoffset: calc(100 - var(--v)); transition: stroke-dashoffset .7s var(--ease), stroke .3s var(--ease), opacity .2s;
+  }
+  .gauge[data-zero] .arc { opacity: 0; }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; text-align: center; }
+  .big { font-family: var(--round); font-size: 3.25rem; line-height: 1; font-weight: 800; letter-spacing: -0.035em; color: var(--ink); text-box: trim-both cap alphabetic; }
+  .unit { line-height: 1; text-box: trim-both cap alphabetic; font-size: .875rem; font-weight: 600; color: var(--ink2); }
+  .gauge[data-state="done"] .big, .gauge[data-state="impossible"] .big { font-size: 1.875rem; letter-spacing: -0.02em; }
+  .gauge[data-state="done"] .big { color: var(--green); }
+  .gauge[data-state="impossible"] .big { color: var(--ink2); }
+  .gauge[data-state="empty"] .big, .gauge[data-state="error"] .big { font-size: 2.5rem; color: var(--ink3); }
+  .sub { margin: 0; min-height: 1.4em; text-align: center; font-size: .9375rem; color: var(--ink2); }
+  .sub strong { color: var(--ink); font-weight: 700; }
+  .sub.err { color: var(--red); font-weight: 600; }
+
+  /* ── 그룹 리스트 ── */
+  .sh { margin: 1.75rem 1rem .4375rem; font-size: .8125rem; font-weight: 500; letter-spacing: .01em; color: var(--ink2); }
+  .sf { margin: .4375rem 1rem 0; min-height: 1.2em; font-size: .8125rem; line-height: 1.35; color: var(--ink2); }
+  .sf.err { color: var(--red); font-weight: 600; }
+  .group { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .sf + .group { margin-top: 1.25rem; }
+  .row { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 2.875rem; padding: .3125rem 1rem; transition: opacity .25s var(--ease); }
+  .row + .row::before, .drawer + .row::before, .row + .drawer::before { content: ""; position: absolute; top: 0; left: 1rem; right: 0; height: .5px; background: var(--sep); }
+  .drawer { position: relative; }
+  .row.off { opacity: .4; }
+  .lbl { flex: 1; min-width: 0; }
+  .lbl small { display: block; font-size: .75rem; color: var(--ink2); }
+  .val { color: var(--ink2); white-space: nowrap; }
+  .field { display: flex; align-items: center; gap: .125rem; color: var(--ink2); }
+  .row input {
+    border: 0; border-radius: 7px; background: transparent; padding: .375rem .375rem; color: var(--ink);
+    font: inherit; font-weight: 600; text-align: right; -moz-appearance: textfield; appearance: textfield;
+    transition: background-color .15s, box-shadow .15s;
+  }
+  .row input[type="number"] { width: 3.5rem; }
+  .row input.max { width: 3.25rem; color: var(--ink2); font-weight: 500; }
+  .row input.nm { flex: 1; min-width: 0; text-align: right; }
+  .row input::-webkit-outer-spin-button, .row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .row input::placeholder { color: var(--ink3); font-weight: 500; }
+  .row input:focus { outline: none; background: var(--fill); }
+  .row input[aria-invalid="true"] { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+  .tap { width: 100%; appearance: none; border: 0; background: transparent; text-align: left; cursor: pointer; transition: background-color .12s; }
+  .tap:active { background: var(--press); }
+  .tap:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .chev { flex: none; width: .5rem; height: .5rem; margin: 0 .125rem 0 .25rem; border: solid var(--ink3); border-width: 0 2.25px 2.25px 0; transform: translateY(-25%) rotate(45deg); transition: transform .35s var(--ease); }
+  .tap[aria-expanded="true"] .chev { transform: translateY(25%) rotate(-135deg); }
+  .chev.r { transform: translateX(-25%) rotate(-45deg); }
+  .danger { justify-content: center; color: var(--red); font-weight: 500; }
+  .danger:disabled { color: var(--ink3); cursor: default; }
+  .danger:disabled:active { background: transparent; }
+
+  .drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--ease); }
+  .drawer.open { grid-template-rows: 1fr; }
+  .drawer > div { overflow: hidden; min-height: 0; opacity: 0; transition: opacity .25s; }
+  .drawer.open > div { opacity: 1; }
+  .drawer .row { padding-left: 1rem; }
+
+  .step { display: block; padding: .625rem 1rem; }
+  .step .k { display: block; font-size: .8125rem; color: var(--ink2); }
+  .step .v { font-weight: 600; }
+  .step.final .v { color: var(--blue); font-weight: 700; }
+
+  /* ── 전체 과목 ── */
+  .srow { gap: .75rem; min-height: 3.5rem; }
+  .mini { --v: 0; --c: var(--blue); flex: none; width: 1.75rem; height: 1.75rem; }
+  .mini svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .mini .track { fill: none; stroke: var(--fill2); stroke-width: 5; }
+  .mini .arc { fill: none; stroke: var(--c); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: calc(100 - var(--v)); }
+  .mini[data-zero] .arc { opacity: 0; }
+  .sname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { flex: none; display: inline-grid; place-items: center; min-width: 1.625rem; height: 1.625rem; border-radius: 7px; background: var(--fill); font-family: var(--round); font-size: .8125rem; font-weight: 800; line-height: 1; }
+  .badge, .chip { text-box: trim-both cap alphabetic; }
+  .sval { flex: none; min-width: 4.5rem; text-align: right; font-family: var(--round); font-weight: 700; }
+  .sval small { font-family: inherit; font-size: .8125rem; font-weight: 600; color: var(--ink2); margin-left: 1px; }
+  .sval.done { color: var(--green); font-size: .9375rem; }
+  .sval.impossible { color: var(--ink2); font-size: .9375rem; }
+  .sval.empty, .sval.error { font-family: inherit; font-size: .875rem; font-weight: 500; color: var(--ink3); }
+  .sval.error { color: var(--red); }
+  .srow.cur { background: color-mix(in srgb, var(--blue) 10%, transparent); }
+
+  .end { height: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+
+  /* ── 토스트 ── */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); z-index: 10;
+    display: flex; align-items: center; gap: 1rem; padding: .5rem .5rem .5rem 1.125rem; border-radius: 99px;
+    background: rgba(44,44,46,.8); color: #fff; font-size: .9375rem; font-weight: 600;
+    -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 12px 32px -10px rgba(0,0,0,.45);
+    transform: translate(-50%, 1.25rem) scale(.94); opacity: 0; pointer-events: none;
+    transition: transform .4s var(--ease), opacity .25s var(--ease);
+  }
+  .toast.show { transform: translate(-50%, 0) scale(1); opacity: 1; pointer-events: auto; }
+  .toast button { appearance: none; border: 0; border-radius: 99px; padding: .375rem .875rem; background: rgba(255,255,255,.18); color: #fff; font-weight: 700; cursor: pointer; }
+  .toast button:active { background: rgba(255,255,255,.3); }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .bar.stuck { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .toast { background: #2C2C2E; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  @media (max-width: 360px) { .gauge { width: 10.5rem; height: 10.5rem; } .big { font-size: 2.75rem; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-property: opacity, color, background-color !important; transition-duration: .15s !important; }
+    .chip:active, .seg button:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap"><header class="large"><h1>기말고사 목표 점수</h1></header></div>
+<div id="sentinel" aria-hidden="true"></div>
+<nav class="bar" id="bar"><div class="chips" id="chips" role="tablist" aria-label="과목"></div></nav>
+
+<main class="wrap">
+  <!-- 결과 -->
+  <section class="hero" aria-label="결과">
+    <div class="seg" id="seg" role="radiogroup" aria-label="목표 성취도"><i class="thumb" aria-hidden="true"></i></div>
+    <div class="gauge" id="gauge" data-state="empty" data-zero>
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle class="arc" cx="60" cy="60" r="52" pathLength="100"/></svg>
+      <div class="center" aria-live="polite" aria-atomic="true"><span class="big" id="big">–</span><span class="unit" id="unit">기말고사</span></div>
+    </div>
+    <p class="sub" id="sub">점수를 입력하세요</p>
+  </section>
+
+  <!-- 점수 -->
+  <p class="sh">점수</p>
+  <div class="group">
+    <label class="row"><span class="lbl">과목 이름</span><input id="nm" class="nm" type="text" maxlength="20" placeholder="이름" autocomplete="off"></label>
+    <div class="row" id="row-sp">
+      <span class="lbl">수행평가<small id="cap-p">40%</small></span>
+      <span class="field"><input id="sp" type="number" inputmode="decimal" min="0" step="any" placeholder="점수" aria-label="수행평가 점수">/<input id="spm" class="max" type="number" inputmode="decimal" min="0" step="any" aria-label="수행평가 만점"></span>
+    </div>
+    <div class="row" id="row-sm">
+      <span class="lbl">중간고사<small id="cap-m">30%</small></span>
+      <span class="field"><input id="sm" type="number" inputmode="decimal" min="0" step="any" placeholder="점수" aria-label="중간고사 점수">/<input id="smm" class="max" type="number" inputmode="decimal" min="0" step="any" aria-label="중간고사 만점"></span>
+    </div>
+  </div>
+  <p class="sf" id="note-s"></p>
+
+  <!-- 반영 비율 -->
+  <div class="group">
+    <button type="button" class="row tap" id="tg-w" aria-expanded="false" aria-controls="dw-w"><span class="lbl">반영 비율</span><span class="val" id="wsum"></span><i class="chev"></i></button>
+    <div class="drawer" id="dw-w"><div>
+      <div class="row"><span class="lbl">수행평가</span><span class="field"><input id="wp" type="number" inputmode="decimal" min="0" max="100" step="any" aria-label="수행평가 비율">%</span></div>
+      <div class="row"><span class="lbl">중간고사</span><span class="field"><input id="wm" type="number" inputmode="decimal" min="0" max="100" step="any" aria-label="중간고사 비율">%</span></div>
+      <div class="row"><span class="lbl">기말고사</span><span class="field"><input id="wf" type="number" inputmode="decimal" min="0" max="100" step="any" aria-label="기말고사 비율">%</span></div>
+    </div></div>
+  </div>
+  <p class="sf" id="note-w">하나를 바꾸면 기말고사 비율이 맞춰져요.</p>
+
+  <!-- 계산 과정 -->
+  <div class="group" id="g-steps" hidden>
+    <button type="button" class="row tap" id="tg-s" aria-expanded="false" aria-controls="dw-s"><span class="lbl">계산 과정</span><i class="chev"></i></button>
+    <div class="drawer" id="dw-s"><div id="steps"></div></div>
+  </div>
+
+  <div class="group" style="margin-top:1.75rem"><button type="button" class="row tap danger" id="del">과목 삭제</button></div>
+
+  <!-- 전체 과목 -->
+  <p class="sh" style="margin-top:2.25rem">전체 과목</p>
+  <div class="group" id="sum"></div>
+  <p class="sf" id="sfoot"></p>
+  <div class="end"></div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-msg"></span><button type="button" id="undo">실행 취소</button></div>
+
+<script>
+(function () {
+  // 총점을 소수 첫째 자리에서 반올림한 정수로 성취도 판정 (예: 89.5 → 90 → A)
+  var GRADES = [{ g: 'A', t: 90 }, { g: 'B', t: 80 }, { g: 'C', t: 70 }, { g: 'D', t: 60 }, { g: 'E', t: 50 }];
+  var KEY = 'gimal-calc-v2', OLD = 'gimal-calc-v1';
+  var FIELDS = ['wp', 'wm', 'wf', 'sp', 'spm', 'sm', 'smm'];
+  var $ = function (id) { return document.getElementById(id); };
+  var el = {}; FIELDS.forEach(function (k) { el[k] = $(k); });
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function num(v) { v = String(v == null ? '' : v).trim(); return v === '' ? NaN : Number(v); }
+  function fmt(n) { return String(+Number(n).toFixed(2)); }
+  function f2(n) { return Number(n).toFixed(2); }
+  function f1(n) { return Number(n).toFixed(1); }
+  function clean(x) { return Math.round(x * 1e9) / 1e9; }
+  function roundInt(x) { return Math.round(clean(x)); }          // 소수 첫째 자리에서 반올림
+  function inR(x, a, b) { return isFinite(x) && x >= a && x <= b; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function tone(f) { return f <= 80 ? 'var(--green)' : f <= 95 ? 'var(--orange)' : 'var(--red)'; }  // 필요 점수 난이도
+
+  // ── 상태 ──
+  function blank(name, from) {
+    return { id: uid(), name: name, wp: from ? from.wp : '40', wm: from ? from.wm : '30', wf: from ? from.wf : '30',
+      sp: '', spm: from ? from.spm : '100', sm: '', smm: from ? from.smm : '100', sel: from ? from.sel : 'A' };
+  }
+  function normalize(s) {          // 이전 버전(wj = 지필 전체) → 기말 비율
+    if (s.wf == null) { var f = num(s.wj) - num(s.wm); s.wf = isFinite(f) ? fmt(f) : '30'; }
+    delete s.wj; if (!s.id) s.id = uid(); return s;
+  }
+  var state = { subjects: [], cur: null };
+  function cur() { return state.subjects.filter(function (s) { return s.id === state.cur; })[0]; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (d && Array.isArray(d.subjects) && d.subjects.length) state = d;
+      else {
+        var o = JSON.parse(localStorage.getItem(OLD) || 'null');
+        if (o) { var s = blank('과목 1'); ['wp','wj','wm','sp','spm','sm','smm','sel'].forEach(function (k) { if (typeof o[k] === 'string') s[k] = o[k]; }); s.wf = null; state.subjects = [s]; }
+      }
+    } catch (e) {}
+    state.subjects = (state.subjects || []).map(normalize);
+    if (!state.subjects.length) state.subjects = [blank('과목 1')];
+    if (!cur()) state.cur = state.subjects[0].id;
+  }
+
+  // ── 계산 ──
+  function compute(s) {
+    var wp = num(s.wp), wm = num(s.wm), wf = num(s.wf);
+    var maxP = num(s.spm), maxM = num(s.smm), P = num(s.sp), M = num(s.sm);
+    var o = { wp: wp, wm: wm, wf: wf, maxP: maxP, maxM: maxM, P: P, M: M, needP: wp > 0, needM: wm > 0, bad: [], msg: '', where: '' };
+    var sum = clean(wp + wm + wf);
+    if (!inR(wp, 0, 100) || !inR(wm, 0, 100) || !inR(wf, 0, 100) || Math.abs(sum - 100) > 1e-9) {
+      o.state = 'error'; o.where = 'w'; o.bad = ['wp', 'wm', 'wf']; o.msg = '비율의 합이 100%가 되어야 해요' + (isFinite(sum) ? ' (지금 ' + fmt(sum) + '%)' : ''); return o;
+    }
+    if (!(wf > 0)) { o.state = 'error'; o.where = 'w'; o.bad = ['wf']; o.msg = '기말고사 비율이 0%보다 커야 해요'; return o; }
+    var msgs = [];
+    if (o.needP && isFinite(P)) {
+      if (!(maxP > 0)) { o.bad.push('spm'); msgs.push('수행평가 만점을 확인하세요'); }
+      else if (!inR(P, 0, maxP)) { o.bad.push('sp'); msgs.push('수행평가 점수는 0~' + fmt(maxP) + '점'); }
+    }
+    if (o.needM && isFinite(M)) {
+      if (!(maxM > 0)) { o.bad.push('smm'); msgs.push('중간고사 만점을 확인하세요'); }
+      else if (!inR(M, 0, maxM)) { o.bad.push('sm'); msgs.push('중간고사 점수는 0~' + fmt(maxM) + '점'); }
+    }
+    if (msgs.length) { o.state = 'error'; o.where = 's'; o.msg = msgs.join(' · '); return o; }
+    if ((o.needP && !isFinite(P)) || (o.needM && !isFinite(M))) { o.state = 'empty'; return o; }
+
+    o.cP = o.needP ? clean(P / maxP * wp) : 0;
+    o.cM = o.needM ? clean(M / maxM * wm) : 0;
+    var base = o.base = clean(o.cP + o.cM), wfr = wf / 100;
+    o.res = GRADES.map(function (G) {
+      var cut = G.t - 0.5, need = clean(cut - base), F = need / wfr;
+      var ok = function (f) { return roundInt(base + f * wfr) >= G.t; };
+      var Fmin = Math.max(0, Math.ceil(F * 10 - 1e-9) / 10), status;
+      if (ok(0)) { status = 'done'; Fmin = 0; }
+      else if (!ok(100)) status = 'impossible';
+      else { status = 'possible'; for (var i = 0; i < 5 && !ok(Fmin); i++) Fmin = Math.round(Fmin * 10 + 1) / 10; }
+      return { g: G.g, t: G.t, cut: cut, need: need, F: F, Fmin: Fmin, status: status };
+    });
+    o.state = 'ok';
+    return o;
+  }
+  function pick(o, g) { return o.res[GRADES.map(function (G) { return G.g; }).indexOf(g)]; }
+
+  // ── 유리 바: 스크롤되어 붙었을 때만 재질이 생김 ──
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (e) { $('bar').classList.toggle('stuck', !e[0].isIntersecting); }, { threshold: 0 }).observe($('sentinel'));
+  }
+
+  // ── 과목 칩 ──
+  function renderChips() {
+    var box = $('chips');
+    box.innerHTML = state.subjects.map(function (s) {
+      var on = s.id === state.cur;
+      return '<button type="button" class="chip" role="tab" data-id="' + s.id + '" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '">' + esc(s.name || '이름 없음') + '</button>';
+    }).join('') + '<button type="button" class="chip add" id="add" aria-label="과목 추가"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>';
+    var a = box.querySelector('[aria-selected="true"]');
+    if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }
+  $('chips').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'add') addSubject(); else selectSubject(b.getAttribute('data-id'));
+  });
+  $('chips').addEventListener('keydown', function (e) {
+    var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+    var i = state.subjects.indexOf(cur()), n = state.subjects[(i + d + state.subjects.length) % state.subjects.length];
+    e.preventDefault(); selectSubject(n.id);
+    var b = $('chips').querySelector('[data-id="' + n.id + '"]'); if (b) b.focus();
+  });
+  function selectSubject(id) { state.cur = id; shown = null; save(); fill(); renderAll(); }
+  function addSubject() {
+    var s = blank('과목 ' + (state.subjects.length + 1), cur());
+    state.subjects.push(s); state.cur = s.id; shown = null; save(); fill(); renderAll();
+    $('nm').focus(); $('nm').select();
+  }
+
+  // ── 삭제 + 실행 취소 ──
+  var lastDel = null, toastT = 0;
+  $('del').addEventListener('click', function () {
+    if (state.subjects.length < 2) return;
+    var s = cur(), i = state.subjects.indexOf(s);
+    lastDel = { s: s, i: i };
+    state.subjects.splice(i, 1);
+    state.cur = state.subjects[Math.min(i, state.subjects.length - 1)].id;
+    shown = null; save(); fill(); renderAll();
+    $('toast-msg').textContent = '‘' + (s.name || '이름 없음') + '’ 삭제됨';
+    $('toast').classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(hideToast, 5000);
+  });
+  function hideToast() { $('toast').classList.remove('show'); lastDel = null; }
+  $('undo').addEventListener('click', function () {
+    if (!lastDel) return;
+    state.subjects.splice(lastDel.i, 0, lastDel.s); state.cur = lastDel.s.id;
+    clearTimeout(toastT); hideToast(); shown = null; save(); fill(); renderAll();
+  });
+
+  // ── 입력 ↔ 상태 ──
+  function fill() { var s = cur(); $('nm').value = s.name; FIELDS.forEach(function (k) { el[k].value = s[k]; }); }
+  $('nm').addEventListener('input', function () { cur().name = this.value; save(); renderChips(); renderSummary(); });
+  $('nm').addEventListener('blur', function () {
+    if (!this.value.trim()) { cur().name = '과목 ' + (state.subjects.indexOf(cur()) + 1); this.value = cur().name; save(); renderChips(); renderSummary(); }
+  });
+  FIELDS.forEach(function (k) {
+    el[k].addEventListener('input', function () {
+      var s = cur(); s[k] = el[k].value;
+      var wp = num(s.wp), wm = num(s.wm), wf = num(s.wf);
+      if ((k === 'wp' || k === 'wm') && inR(wp, 0, 100) && inR(wm, 0, 100) && wp + wm <= 100) s.wf = el.wf.value = fmt(100 - wp - wm);
+      if (k === 'wf' && inR(wf, 0, 100) && inR(wm, 0, 100) && wf + wm <= 100) s.wp = el.wp.value = fmt(100 - wm - wf);
+      save(); render(); renderSummary();
+    });
+  });
+
+  // ── 디스클로저 ──
+  function disclose(btnId, dwId) {
+    $(btnId).addEventListener('click', function () {
+      var open = this.getAttribute('aria-expanded') !== 'true';
+      this.setAttribute('aria-expanded', String(open));
+      $(dwId).classList.toggle('open', open);
+    });
+  }
+  disclose('tg-w', 'dw-w'); disclose('tg-s', 'dw-s');
+  function openW() { $('tg-w').setAttribute('aria-expanded', 'true'); $('dw-w').classList.add('open'); }
+
+  // ── 성취도 세그먼트 ──
+  var seg = $('seg');
+  GRADES.forEach(function (G, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 't-' + G.g; b.setAttribute('role', 'radio');
+    b.innerHTML = '<span class="g">' + G.g + '</span><span class="gs"></span>';
+    b.addEventListener('click', function () { cur().sel = G.g; save(); render(); renderSummary(); });
+    b.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!d) return; e.preventDefault();
+      var n = GRADES[(i + d + GRADES.length) % GRADES.length].g; cur().sel = n; save(); render(); renderSummary(); $('t-' + n).focus();
+    });
+    seg.appendChild(b);
+  });
+  function paintSeg(res, sel) {
+    var idx = 0;
+    GRADES.forEach(function (G, i) {
+      var b = $('t-' + G.g), r = res && res[i], on = G.g === sel;
+      if (on) idx = i;
+      b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
+      b.setAttribute('aria-label', G.g + (r ? (r.status === 'done' ? ', 이미 달성' : r.status === 'impossible' ? ', 달성 불가' : ', ' + f1(r.Fmin) + '점 필요') : ''));
+      b.classList.toggle('imp', !!(r && r.status === 'impossible'));
+      b.classList.toggle('done', !!(r && r.status === 'done'));
+      b.querySelector('.gs').textContent = !r ? '' : r.status === 'done' ? '달성' : r.status === 'impossible' ? '불가' : f1(r.Fmin);
+    });
+    seg.style.setProperty('--i', idx);
+  }
+
+  // 숫자 트윈: 화면에 보이는 현재 값에서 출발 → 도중에 바뀌어도 튀지 않음
+  var shown = null, raf = 0;
+  function tweenTo(target) {
+    var big = $('big');
+    cancelAnimationFrame(raf);
+    if (reduce || shown === null) { shown = target; big.textContent = f1(target); return; }
+    var from = shown, t0 = performance.now(), dur = 420;
+    (function step(now) {
+      var p = Math.min((now - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      shown = from + (target - from) * e;
+      big.textContent = f1(p === 1 ? target : shown);
+      if (p < 1) raf = requestAnimationFrame(step);
+    })(t0);
+  }
+  function gauge(state, v, color) {
+    var g = $('gauge');
+    g.setAttribute('data-state', state);
+    g.style.setProperty('--v', v);
+    g.style.setProperty('--c', color);
+    if (v > 0) g.removeAttribute('data-zero'); else g.setAttribute('data-zero', '');
+  }
+
+  // ── 현재 과목 렌더 ──
+  function render() {
+    var s = cur(), o = compute(s);
+    $('del').disabled = state.subjects.length < 2;
+    $('wsum').textContent = '수행 ' + (s.wp || '–') + ' · 중간 ' + (s.wm || '–') + ' · 기말 ' + (s.wf || '–');
+    $('cap-p').textContent = (isFinite(o.wp) ? fmt(o.wp) : '–') + '%';
+    $('cap-m').textContent = (isFinite(o.wm) ? fmt(o.wm) : '–') + '%';
+    var offP = o.wp === 0, offM = o.wm === 0;
+    el.sp.disabled = el.spm.disabled = offP; el.sm.disabled = el.smm.disabled = offM;
+    $('row-sp').classList.toggle('off', offP); $('row-sm').classList.toggle('off', offM);
+    FIELDS.forEach(function (k) { el[k].setAttribute('aria-invalid', String(o.bad.indexOf(k) >= 0)); });
+
+    var ns = $('note-s'), nw = $('note-w');
+    ns.textContent = o.where === 's' ? o.msg : ''; ns.classList.toggle('err', o.where === 's');
+    nw.textContent = o.where === 'w' ? o.msg : '하나를 바꾸면 기말고사 비율이 맞춰져요.'; nw.classList.toggle('err', o.where === 'w');
+    if (o.where === 'w') openW();
+
+    var sub = $('sub');
+    if (o.state !== 'ok') {
+      paintSeg(null, s.sel);
+      cancelAnimationFrame(raf); shown = null;
+      gauge(o.state, 0, 'var(--blue)');
+      $('big').textContent = '–'; $('unit').textContent = '기말고사';
+      sub.textContent = o.state === 'error' ? '입력값을 확인하세요' : '점수를 입력하세요';
+      sub.classList.toggle('err', o.state === 'error');
+      $('g-steps').hidden = true;
+      return;
+    }
+    sub.classList.remove('err');
+    paintSeg(o.res, s.sel);
+
+    var r = pick(o, s.sel), wfr = o.wf / 100, total = clean(o.base + r.Fmin * wfr);
+    if (r.status === 'possible') {
+      if ($('gauge').getAttribute('data-state') !== 'possible') shown = null;
+      gauge('possible', Math.min(r.Fmin, 100), tone(r.Fmin));
+      tweenTo(r.Fmin);
+      $('unit').textContent = '점 이상';
+      sub.innerHTML = '총점 ' + f2(total) + ' → 반올림 <strong>' + roundInt(total) + '점 · ' + r.g + '</strong>';
+    } else if (r.status === 'done') {
+      cancelAnimationFrame(raf); shown = null;
+      gauge('done', 100, 'var(--green)');
+      $('big').textContent = '달성'; $('unit').textContent = r.g + ' 확보';
+      sub.innerHTML = '기말 0점이어도 총점 <strong>' + roundInt(o.base) + '점</strong>';
+    } else {
+      cancelAnimationFrame(raf); shown = null;
+      var max = clean(o.base + o.wf);
+      gauge('impossible', 0, 'var(--gray)');
+      $('big').textContent = '불가'; $('unit').textContent = r.g + ' 목표';
+      sub.innerHTML = '기말 100점이어도 총점 ' + f2(max) + ' → <strong>' + roundInt(max) + '점</strong>';
+    }
+
+    var st = [];
+    if (o.needP) st.push(['수행평가 반영점수', fmt(o.P) + '/' + fmt(o.maxP) + ' × ' + fmt(o.wp) + ' = ' + f2(o.cP)]);
+    if (o.needM) st.push(['중간고사 반영점수', fmt(o.M) + '/' + fmt(o.maxM) + ' × ' + fmt(o.wm) + ' = ' + f2(o.cM)]);
+    st.push(['반올림해서 ' + r.t + '점이 되는 최소 총점', r.t + ' − 0.5 = ' + f1(r.cut)]);
+    st.push(['기말고사에서 필요한 반영점수', f1(r.cut) + ' − ' + f2(o.base) + ' = ' + f2(r.need)]);
+    if (r.status !== 'done') st.push(['기말고사 원점수로 환산', f2(r.need) + ' ÷ ' + fmt(o.wf) + '% = ' + f2(r.F)]);
+    st.push(['결과', r.status === 'possible' ? f1(r.Fmin) + '점 이상 (0.1점 단위 올림)' : r.status === 'done' ? '이미 달성' : '달성 불가 (' + f1(r.F) + '점 필요)', true]);
+    $('steps').innerHTML = st.map(function (it) {
+      return '<div class="row step' + (it[2] ? ' final' : '') + '"><span class="k">' + it[0] + '</span><span class="v">' + it[1] + '</span></div>';
+    }).join('');
+    $('g-steps').hidden = false;
+  }
+
+  // ── 전체 과목 ──
+  function ring(v, c) {
+    return '<span class="mini" style="--v:' + v + ';--c:' + c + '"' + (v > 0 ? '' : ' data-zero') + '><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="arc" cx="12" cy="12" r="9" pathLength="100"/></svg></span>';
+  }
+  function renderSummary() {
+    var n = { done: 0, impossible: 0 }, vals = [];
+    $('sum').innerHTML = state.subjects.map(function (s) {
+      var o = compute(s), cls, html, rg;
+      if (o.state === 'error') { cls = 'error'; html = '확인 필요'; rg = ring(0, 'var(--gray)'); }
+      else if (o.state === 'empty') { cls = 'empty'; html = '입력 필요'; rg = ring(0, 'var(--gray)'); }
+      else {
+        var r = pick(o, s.sel); cls = r.status;
+        if (r.status === 'possible') { html = f1(r.Fmin) + '<small>점</small>'; vals.push(r.Fmin); rg = ring(Math.min(r.Fmin, 100), tone(r.Fmin)); }
+        else if (r.status === 'done') { html = '달성'; n.done++; rg = ring(100, 'var(--green)'); }
+        else { html = '불가'; n.impossible++; rg = ring(0, 'var(--gray)'); }
+      }
+      return '<button type="button" class="row tap srow' + (s.id === state.cur ? ' cur' : '') + '" data-id="' + s.id + '">' + rg +
+        '<span class="sname">' + esc(s.name || '이름 없음') + '</span><span class="badge" aria-label="목표 ' + s.sel + '">' + s.sel + '</span>' +
+        '<span class="sval ' + cls + '">' + html + '</span><i class="chev r"></i></button>';
+    }).join('');
+    var parts = [];
+    if (vals.length) parts.push('필요 점수 평균 ' + f1(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length) + '점');
+    if (n.done) parts.push('이미 달성 ' + n.done + '과목');
+    if (n.impossible) parts.push('불가 ' + n.impossible + '과목');
+    $('sfoot').textContent = parts.join(' · ');
+  }
+  $('sum').addEventListener('click', function (e) {
+    var b = e.target.closest('.srow'); if (!b) return;
+    selectSubject(b.getAttribute('data-id'));
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  });
+
+  function renderAll() { renderChips(); render(); renderSummary(); }
+
+  load(); fill(); renderAll();
+})();
+</script>
+</body>
+</html>
